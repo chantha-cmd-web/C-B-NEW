@@ -905,7 +905,7 @@
                     campus: findHeaderIndex(headerRow, 'Campus'),
                     position: findHeaderIndex(headerRow, 'Current Position') !== -1 ? findHeaderIndex(headerRow, 'Current Position') : findHeaderIndex(headerRow, 'Position'),
                     department: findHeaderIndex(headerRow, 'Department'),
-                    lastDay: findHeaderIndex(headerRow, 'BI') !== -1 ? findHeaderIndex(headerRow, 'BI') : (findHeaderIndex(headerRow, 'Last day of Employee') !== -1 ? findHeaderIndex(headerRow, 'Last day of Employee') : findHeaderIndex(headerRow, 'Last Working Day'))
+                    lastDay: findHeaderIndex(headerRow, 'Last day of Employee') !== -1 ? findHeaderIndex(headerRow, 'Last day of Employee') : findHeaderIndex(headerRow, 'Last Working Day')
                 };
                 staffMasterData = []; staffLookup = {};
                 for (let i = headerRowIndex + 1; i < allRows.length; i++) {
@@ -946,13 +946,27 @@
             }
         }
 
-        function parseDateDMY(str) {
+        function parseDateAuto(str) {
             if (!str) return null;
-            const parts = str.trim().split(/[\-\/\.\s]+/);
-            if (parts.length < 3) return null;
+            str = str.trim();
             const months = {jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
-            const d = parseInt(parts[0]), m = months[parts[1].toLowerCase().slice(0,3)], y = parseInt(parts[2]);
+            const longMonths = {january:0,february:1,march:2,april:3,may:4,june:5,july:6,august:7,september:8,october:9,november:10,december:11};
+            const parts = str.split(/[\-\/\.\s,]+/).filter(Boolean);
+            if (parts.length < 3) return null;
+            if (longMonths[parts[0].toLowerCase()] !== undefined) {
+                const m = longMonths[parts[0].toLowerCase()];
+                const d = parseInt(parts[1]);
+                const y = parseInt(parts[2]);
+                if (!isNaN(d) && !isNaN(y)) return new Date(y, m, d);
+            }
+            const d = parseInt(parts[0]);
+            const m = months[parts[1].toLowerCase().slice(0,3)];
+            const y = parseInt(parts[2]);
             if (!isNaN(d) && m !== undefined && !isNaN(y)) return new Date(y, m, d);
+            const d2 = parseInt(parts[1]);
+            const m2 = months[parts[0].toLowerCase().slice(0,3)];
+            const y2 = parseInt(parts[2]);
+            if (!isNaN(d2) && m2 !== undefined && !isNaN(y2)) return new Date(y2, m2, d2);
             return null;
         }
 
@@ -976,9 +990,9 @@
             if (entry.department) document.getElementById('res-department').value = entry.department;
             document.getElementById('res-position').value = entry.position;
             if (entry.status) document.getElementById('res-status').value = entry.status;
-            const sd = parseDateDMY(entry.start);
+            const sd = parseDateAuto(entry.start);
             if (sd) document.getElementById('res-start').value = sd.toISOString().split('T')[0];
-            const ld = parseDateDMY(entry.lastDay);
+            const ld = parseDateAuto(entry.lastDay);
             if (ld) document.getElementById('res-end').value = ld.toISOString().split('T')[0];
         }
 
