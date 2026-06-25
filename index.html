@@ -948,10 +948,10 @@
 
         function parseDateAuto(str) {
             if (!str) return null;
-            str = str.trim();
+            str = str.trim().replace(/,/g, '');
             const months = {jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
             const longMonths = {january:0,february:1,march:2,april:3,may:4,june:5,july:6,august:7,september:8,october:9,november:10,december:11};
-            const parts = str.split(/[\-\/\.\s,]+/).filter(Boolean);
+            const parts = str.split(/[\-\/\.\s]+/).filter(Boolean);
             if (parts.length < 3) return null;
             if (longMonths[parts[0].toLowerCase()] !== undefined) {
                 const m = longMonths[parts[0].toLowerCase()];
@@ -963,10 +963,6 @@
             const m = months[parts[1].toLowerCase().slice(0,3)];
             const y = parseInt(parts[2]);
             if (!isNaN(d) && m !== undefined && !isNaN(y)) return new Date(y, m, d);
-            const d2 = parseInt(parts[1]);
-            const m2 = months[parts[0].toLowerCase().slice(0,3)];
-            const y2 = parseInt(parts[2]);
-            if (!isNaN(d2) && m2 !== undefined && !isNaN(y2)) return new Date(y2, m2, d2);
             return null;
         }
 
@@ -1117,15 +1113,16 @@
             if (!files || files.length === 0) return [];
             const uploaded = [];
             for (const file of files) {
-                const path = `${collection}/${docId}/${Date.now()}_${file.name}`;
-                const ref = storage_fs.ref().child(path);
-                const metadata = {
-                    contentType: file.type || 'application/pdf',
-                    contentDisposition: 'inline; filename="' + file.name + '"'
-                };
-                const snapshot = await ref.put(file, metadata);
-                const url = await snapshot.ref.getDownloadURL();
-                uploaded.push({ name: file.name, url });
+                try {
+                    const path = `${collection}/${docId}/${Date.now()}_${file.name}`;
+                    const ref = storage_fs.ref().child(path);
+                    const snapshot = await ref.put(file, { contentType: file.type || 'application/pdf' });
+                    const url = await snapshot.ref.getDownloadURL();
+                    uploaded.push({ name: file.name, url });
+                } catch (e) {
+                    console.error('Upload failed:', e);
+                    showNotification(`Failed to upload "${file.name}": ${e.message}`, 'error');
+                }
             }
             return uploaded;
         }
@@ -1242,18 +1239,26 @@
             }
             const data = { staffId: document.getElementById('res-id').value, name: document.getElementById('res-name').value, nationality: document.getElementById('res-nationality').value, campus: document.getElementById('res-campus').value, department: document.getElementById('res-department').value, position: document.getElementById('res-position').value, status: document.getElementById('res-status').value, reason: document.getElementById('res-reason').value, start: document.getElementById('res-start').value, end: document.getElementById('res-end').value, clearance: document.getElementById('res-clearance').value, timestamp: Date.now() };
             let docId = editId;
-            if (editId) {
-                await db_fs.collection('resignations').doc(editId).set(data, { merge: true });
-                showNotification('Record updated.');
-            } else {
-                const docRef = await db_fs.collection('resignations').add(data);
-                docId = docRef.id;
-                showNotification('Record added.');
-            }
-            if (fileInput.files.length > 0) {
-                if (editId) await deleteStorageFiles('resignations', editId);
-                const files = await uploadFilesToStorage(fileInput.files, 'resignations', docId);
-                await db_fs.collection('resignations').doc(docId).set({ files, fileData: null }, { merge: true });
+            try {
+                if (editId) {
+                    await db_fs.collection('resignations').doc(editId).set(data, { merge: true });
+                    showNotification('Record updated.');
+                } else {
+                    const docRef = await db_fs.collection('resignations').add(data);
+                    docId = docRef.id;
+                    showNotification('Record added.');
+                }
+                if (fileInput.files.length > 0) {
+                    if (editId) await deleteStorageFiles('resignations', editId);
+                    const files = await uploadFilesToStorage(fileInput.files, 'resignations', docId);
+                    if (files.length > 0) {
+                        await db_fs.collection('resignations').doc(docId).set({ files, fileData: null }, { merge: true });
+                    }
+                }
+            } catch (e) {
+                console.error('Submit failed:', e);
+                showNotification('Error saving record: ' + e.message, 'error');
+                return;
             }
             document.getElementById('resignation-form').reset(); document.getElementById('res-edit-id').value = ''; document.getElementById('res-file-label').innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> Click here to Upload PDF'; document.getElementById('res-campus').value = ''; document.getElementById('res-form-title').innerText = 'Add New Record'; document.getElementById('res-submit-btn').innerHTML = '<i class="fa-solid fa-save"></i> Save Record'; document.getElementById('res-cancel-btn').style.display = 'none';
         }
@@ -1277,18 +1282,26 @@
             }
             const data = { month: document.getElementById('nssf-month').value, year: document.getElementById('nssf-year').value, staff: document.getElementById('nssf-staff').value, amount: parseFloat(document.getElementById('nssf-amount').value), timestamp: Date.now() };
             let docId = editId;
-            if (editId) {
-                await db_fs.collection('nssf').doc(editId).set(data, { merge: true });
-                showNotification('Record updated.');
-            } else {
-                const docRef = await db_fs.collection('nssf').add(data);
-                docId = docRef.id;
-                showNotification('Record uploaded.');
-            }
-            if (fileInput.files.length > 0) {
-                if (editId) await deleteStorageFiles('nssf', editId);
-                const files = await uploadFilesToStorage(fileInput.files, 'nssf', docId);
-                await db_fs.collection('nssf').doc(docId).set({ files, fileData: null }, { merge: true });
+            try {
+                if (editId) {
+                    await db_fs.collection('nssf').doc(editId).set(data, { merge: true });
+                    showNotification('Record updated.');
+                } else {
+                    const docRef = await db_fs.collection('nssf').add(data);
+                    docId = docRef.id;
+                    showNotification('Record uploaded.');
+                }
+                if (fileInput.files.length > 0) {
+                    if (editId) await deleteStorageFiles('nssf', editId);
+                    const files = await uploadFilesToStorage(fileInput.files, 'nssf', docId);
+                    if (files.length > 0) {
+                        await db_fs.collection('nssf').doc(docId).set({ files, fileData: null }, { merge: true });
+                    }
+                }
+            } catch (e) {
+                console.error('NSSF submit failed:', e);
+                showNotification('Error saving NSSF: ' + e.message, 'error');
+                return;
             }
             cancelEdit('nssf');
         }
@@ -1310,18 +1323,26 @@
             }
             const data = { staffId: document.getElementById('don-id').value, name: document.getElementById('don-name').value, campus: document.getElementById('don-campus').value, status: document.getElementById('don-status').value, type: document.getElementById('don-type').value, amount: parseFloat(document.getElementById('don-amount').value), date: document.getElementById('don-date').value, timestamp: Date.now() };
             let docId = editId;
-            if (editId) {
-                await db_fs.collection('donations').doc(editId).set(data, { merge: true });
-                showNotification('Record updated.');
-            } else {
-                const docRef = await db_fs.collection('donations').add(data);
-                docId = docRef.id;
-                showNotification('Record saved.');
-            }
-            if (fileInput.files.length > 0) {
-                if (editId) await deleteStorageFiles('donations', editId);
-                const files = await uploadFilesToStorage(fileInput.files, 'donations', docId);
-                await db_fs.collection('donations').doc(docId).set({ files, fileData: null }, { merge: true });
+            try {
+                if (editId) {
+                    await db_fs.collection('donations').doc(editId).set(data, { merge: true });
+                    showNotification('Record updated.');
+                } else {
+                    const docRef = await db_fs.collection('donations').add(data);
+                    docId = docRef.id;
+                    showNotification('Record saved.');
+                }
+                if (fileInput.files.length > 0) {
+                    if (editId) await deleteStorageFiles('donations', editId);
+                    const files = await uploadFilesToStorage(fileInput.files, 'donations', docId);
+                    if (files.length > 0) {
+                        await db_fs.collection('donations').doc(docId).set({ files, fileData: null }, { merge: true });
+                    }
+                }
+            } catch (e) {
+                console.error('Donation submit failed:', e);
+                showNotification('Error saving donation: ' + e.message, 'error');
+                return;
             }
             document.getElementById('donation-form').reset(); document.getElementById('don-edit-id').value = ''; document.getElementById('don-file-label').innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> Click here to Upload PDF'; document.getElementById('don-campus').value = ''; document.getElementById('don-form-title').innerText = 'Add Donation Record'; document.getElementById('don-submit-btn').innerHTML = '<i class="fa-solid fa-save"></i> Save Record'; document.getElementById('don-cancel-btn').style.display = 'none';
         }
