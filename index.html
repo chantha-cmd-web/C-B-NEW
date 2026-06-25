@@ -905,7 +905,7 @@
                     campus: findHeaderIndex(headerRow, 'Campus'),
                     position: findHeaderIndex(headerRow, 'Current Position') !== -1 ? findHeaderIndex(headerRow, 'Current Position') : findHeaderIndex(headerRow, 'Position'),
                     department: findHeaderIndex(headerRow, 'Department'),
-                    lastDay: findHeaderIndex(headerRow, 'BH') !== -1 ? findHeaderIndex(headerRow, 'BH') : (findHeaderIndex(headerRow, 'Last day of Employee') !== -1 ? findHeaderIndex(headerRow, 'Last day of Employee') : findHeaderIndex(headerRow, 'Last Working Day'))
+                    lastDay: findHeaderIndex(headerRow, 'BI') !== -1 ? findHeaderIndex(headerRow, 'BI') : (findHeaderIndex(headerRow, 'Last day of Employee') !== -1 ? findHeaderIndex(headerRow, 'Last day of Employee') : findHeaderIndex(headerRow, 'Last Working Day'))
                 };
                 staffMasterData = []; staffLookup = {};
                 for (let i = headerRowIndex + 1; i < allRows.length; i++) {
