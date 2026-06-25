@@ -1356,10 +1356,14 @@
         }
 
         async function deleteRecord(collection, id) {
-            if(confirm('Are you sure you want to delete this record?')) {
+            if(!confirm('Are you sure you want to delete this record?')) return;
+            try {
                 await deleteStorageFiles(collection, id);
                 await db_fs.collection(collection).doc(id).delete();
                 showNotification('Record deleted.');
+            } catch(e) {
+                console.error('Delete failed:', e);
+                showNotification('Error deleting record: ' + e.message, 'error');
             }
         }
 
@@ -1410,7 +1414,9 @@
         }
 
         async function resetSystem() {
-            if(confirm('WARNING: This will permanently delete ALL system records and files. Continue?')) {
+            if(!confirm('WARNING: This will permanently delete ALL system records and files. Continue?')) return;
+            if(!confirm('ARE YOU SURE? This action CANNOT be undone. All records, files, and data will be permanently deleted.')) return;
+            try {
                 for (const coll of ['resignations', 'nssf', 'donations']) {
                     try {
                         const ref = storage_fs.ref().child(coll);
@@ -1419,15 +1425,21 @@
                             const items = await folder.listAll();
                             for (const item of items.items) await item.delete();
                         }
-                    } catch(e) {}
+                    } catch(e) { console.warn('Storage cleanup issue:', coll, e); }
                 }
                 for (const coll of ['resignations', 'nssf', 'donations']) {
                     const snapshot = await db_fs.collection(coll).get();
-                    const batch = db_fs.batch();
-                    snapshot.forEach(doc => batch.delete(doc.ref));
-                    await batch.commit();
+                    const docs = snapshot.docs;
+                    for (let i = 0; i < docs.length; i += 500) {
+                        const batch = db_fs.batch();
+                        docs.slice(i, i + 500).forEach(doc => batch.delete(doc.ref));
+                        await batch.commit();
+                    }
                 }
                 showNotification('System factory reset complete. All data has been cleared.');
+            } catch(e) {
+                console.error('Reset failed:', e);
+                showNotification('Reset error: ' + e.message, 'error');
             }
         }
 
