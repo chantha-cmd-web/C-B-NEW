@@ -1677,7 +1677,10 @@
         window.onload = function () {
             firebase.auth().signInAnonymously()
                 .then(() => { authReady = true; checkAuth(); })
-                .catch(e => { console.error('Auth failed:', e); authReady = true; checkAuth(); });
+                .catch(e => {
+                    console.error('Anonymous auth failed:', e);
+                    showNotification('Authentication failed. Please check Firebase Anonymous Auth is enabled.', 'error');
+                });
         };
     </script>
 </body>
