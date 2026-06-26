@@ -818,7 +818,7 @@
             }, (err) => {
                 console.error('Firestore listener error:', err);
                 setSyncStatus('disconnected');
-                showNotification('Real-time sync error. Check console.', 'error');
+                showNotification('Sync error: ' + (err.code || err.message || 'unknown'), 'error');
             });
             unsubscribers.push(unsub);
         }
@@ -1675,12 +1675,15 @@
         try { setTheme(getTheme()); } catch(e) { console.error('Theme init failed (localStorage likely blocked):', e); }
         try { const sbState = localStorage.getItem('cb_sidebar'); if(sbState === 'collapsed') document.getElementById('mainSidebar').classList.add('collapsed'); } catch(e) { console.error('Sidebar init failed:', e); }
         window.onload = function () {
-            firebase.auth().signInAnonymously()
-                .then(() => { authReady = true; checkAuth(); })
-                .catch(e => {
-                    console.error('Anonymous auth failed:', e);
-                    showNotification('Authentication failed. Please check Firebase Anonymous Auth is enabled.', 'error');
-                });
+            firebase.auth().onAuthStateChanged(user => {
+                if (user) {
+                    if (!authReady) { authReady = true; checkAuth(); }
+                }
+            });
+            firebase.auth().signInAnonymously().catch(e => {
+                console.error('Anonymous auth failed:', e);
+                showNotification('Auth error. Please enable Anonymous Auth in Firebase Console (Authentication → Sign-in method).', 'error');
+            });
         };
     </script>
 </body>
