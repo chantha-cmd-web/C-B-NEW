@@ -1358,9 +1358,9 @@
         async function deleteRecord(collection, id) {
             if(!confirm('Are you sure you want to delete this record?')) return;
             try {
-                await deleteStorageFiles(collection, id);
                 await db_fs.collection(collection).doc(id).delete();
                 showNotification('Record deleted.');
+                deleteStorageFiles(collection, id);
             } catch(e) {
                 console.error('Delete failed:', e);
                 showNotification('Error deleting record: ' + e.message, 'error');
