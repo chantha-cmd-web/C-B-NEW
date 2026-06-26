@@ -10,6 +10,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
     <style>
@@ -745,6 +746,7 @@
         firebase.initializeApp(firebaseConfig);
         const db_fs = firebase.firestore();
         const storage_fs = firebase.storage();
+        let authReady = false;
 
         function getTheme() { try { return localStorage.getItem('cb_theme') || 'day'; } catch(e) { return 'day'; } }
         function setTheme(theme) {
@@ -1013,6 +1015,7 @@
 
         function initFirestore() {
             if (firestoreInitialized) return;
+            if (!authReady) return;
             firestoreInitialized = true;
             setSyncStatus('connecting');
             db.resignations = []; db.nssf = []; db.donations = []; db.users = []; db.config = {};
@@ -1671,7 +1674,11 @@
 
         try { setTheme(getTheme()); } catch(e) { console.error('Theme init failed (localStorage likely blocked):', e); }
         try { const sbState = localStorage.getItem('cb_sidebar'); if(sbState === 'collapsed') document.getElementById('mainSidebar').classList.add('collapsed'); } catch(e) { console.error('Sidebar init failed:', e); }
-        window.onload = checkAuth;
+        window.onload = function () {
+            firebase.auth().signInAnonymously()
+                .then(() => { authReady = true; checkAuth(); })
+                .catch(e => { console.error('Auth failed:', e); authReady = true; checkAuth(); });
+        };
     </script>
 </body>
 </html>
