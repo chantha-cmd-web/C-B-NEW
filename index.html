@@ -1035,6 +1035,7 @@
                 document.getElementById('login-container').style.display = 'none';
                 document.getElementById('app-container').style.display = 'flex';
                 switchView('dashboard-view');
+                updateAllViews();
                 setTimeout(() => {
                     if (!allReadyFired) {
                         setSyncStatus('disconnected');
