@@ -1070,6 +1070,7 @@
                 document.getElementById('app-container').style.display = 'flex';
                 switchView('dashboard-view');
                 updateAllViews();
+                setSyncStatus('connected');
                 setTimeout(() => {
                     if (!allReadyFired) {
                         setSyncStatus('disconnected');
