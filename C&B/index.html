@@ -1326,7 +1326,6 @@
                     showNotification('Record added.');
                 }
                 if (fileInput.files.length > 0) {
-                    if (editId) await deleteStorageFiles('resignations', editId);
                     const files = await uploadFilesToStorage(fileInput.files, 'resignations', docId);
                     if (files.length > 0) {
                         await db_fs.collection('resignations').doc(docId).set({ files, fileData: null }, { merge: true });
@@ -1369,7 +1368,6 @@
                     showNotification('Record uploaded.');
                 }
                 if (fileInput.files.length > 0) {
-                    if (editId) await deleteStorageFiles('nssf', editId);
                     const files = await uploadFilesToStorage(fileInput.files, 'nssf', docId);
                     if (files.length > 0) {
                         await db_fs.collection('nssf').doc(docId).set({ files, fileData: null }, { merge: true });
@@ -1410,7 +1408,6 @@
                     showNotification('Record saved.');
                 }
                 if (fileInput.files.length > 0) {
-                    if (editId) await deleteStorageFiles('donations', editId);
                     const files = await uploadFilesToStorage(fileInput.files, 'donations', docId);
                     if (files.length > 0) {
                         await db_fs.collection('donations').doc(docId).set({ files, fileData: null }, { merge: true });
@@ -1437,7 +1434,6 @@
             try {
                 await db_fs.collection(collection).doc(id).delete();
                 showNotification('Record deleted.');
-                deleteStorageFiles(collection, id);
             } catch(e) {
                 console.error('Delete failed:', e);
                 showNotification('Error deleting record: ' + e.message, 'error');
