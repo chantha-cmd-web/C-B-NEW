@@ -1180,16 +1180,22 @@
             return (record.files && record.files.length > 0) || record.fileData;
         }
 
+        function readFileAsBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = () => reject(new Error('Failed to read file'));
+                reader.readAsDataURL(file);
+            });
+        }
+
         async function uploadFilesToStorage(files, collection, docId) {
             if (!files || files.length === 0) return [];
             const uploaded = [];
             for (const file of files) {
                 try {
-                    const path = `${collection}/${docId}/${Date.now()}_${file.name}`;
-                    const ref = storage_fs.ref().child(path);
-                    const snapshot = await ref.put(file, { contentType: file.type || 'application/pdf' });
-                    const url = await snapshot.ref.getDownloadURL();
-                    uploaded.push({ name: file.name, url });
+                    const dataUrl = await readFileAsBase64(file);
+                    uploaded.push({ name: file.name, data: dataUrl });
                 } catch (e) {
                     console.error('Upload failed:', e);
                     showNotification(`Failed to upload "${file.name}": ${e.message}`, 'error');
@@ -1200,10 +1206,8 @@
 
         async function deleteStorageFiles(collection, docId) {
             try {
-                const ref = storage_fs.ref().child(`${collection}/${docId}`);
-                const result = await ref.listAll();
-                for (const item of result.items) await item.delete();
-            } catch (e) { /* no files or already deleted */ }
+                await db_fs.collection(collection).doc(docId).set({ files: [] }, { merge: true });
+            } catch (e) { /* ignore */ }
         }
 
         function openPdfViewer(collection, id) {
@@ -1220,17 +1224,18 @@
             } else if (record.files && record.files.length > 0) {
                 titleEl.innerText = `Document Viewer - ${record.files.length} file(s)`;
                 listEl.innerHTML = record.files.map((f, i) => {
-                    const safeUrl = f.url.replace(/'/g, "\\'");
-                    return `<button data-url="${safeUrl}" style="padding:4px 12px;border-radius:8px;border:1px solid var(--glass-border);background:var(--input-bg);color:var(--text-primary);cursor:pointer;font-size:0.8rem;"><i class="fa-solid fa-file-pdf" style="color:var(--danger);"></i> ${f.name}</button>`;
+                    const src = f.data || f.url || '';
+                    const safeSrc = src.replace(/'/g, "\\'");
+                    return `<button data-src="${safeSrc}" style="padding:4px 12px;border-radius:8px;border:1px solid var(--glass-border);background:var(--input-bg);color:var(--text-primary);cursor:pointer;font-size:0.8rem;"><i class="fa-solid fa-file-pdf" style="color:var(--danger);"></i> ${f.name}</button>`;
                 }).join('');
                 listEl.querySelectorAll('button').forEach((btn, i) => {
                     btn.onclick = function() {
-                        embedEl.src = this.dataset.url;
+                        embedEl.src = this.dataset.src;
                         listEl.querySelectorAll('button').forEach(b => b.style.outline = 'none');
                         this.style.outline = '2px solid var(--accent-primary)';
                     };
                 });
-                embedEl.src = record.files[0].url;
+                embedEl.src = record.files[0].data || record.files[0].url || '';
                 if (listEl.firstChild) listEl.firstChild.style.outline = '2px solid var(--accent-primary)';
                 document.getElementById('pdfModal').style.display = 'flex';
             } else {
@@ -1306,7 +1311,7 @@
             const editId = document.getElementById('res-edit-id').value;
             const fileInput = document.getElementById('res-file');
             for (const file of fileInput.files) {
-                if (file.size > 1073741824) { showNotification(`File "${file.name}" exceeds 1GB limit.`, 'error'); return; }
+                if (file.size > 524288) { showNotification(`File "${file.name}" exceeds 500KB limit.`, 'error'); return; }
             }
             const data = { staffId: document.getElementById('res-id').value, name: document.getElementById('res-name').value, nationality: document.getElementById('res-nationality').value, campus: document.getElementById('res-campus').value, department: document.getElementById('res-department').value, position: document.getElementById('res-position').value, status: document.getElementById('res-status').value, reason: document.getElementById('res-reason').value, start: document.getElementById('res-start').value, end: document.getElementById('res-end').value, clearance: document.getElementById('res-clearance').value, timestamp: Date.now() };
             let docId = editId;
@@ -1349,7 +1354,7 @@
             const fileInput = document.getElementById('nssf-file');
             if (fileInput.files.length === 0 && !editId) { showNotification('Please attach an NSSF PDF file.','error'); return; }
             for (const file of fileInput.files) {
-                if (file.size > 1073741824) { showNotification(`File "${file.name}" exceeds 1GB limit.`, 'error'); return; }
+                if (file.size > 524288) { showNotification(`File "${file.name}" exceeds 500KB limit.`, 'error'); return; }
             }
             const data = { month: document.getElementById('nssf-month').value, year: document.getElementById('nssf-year').value, staff: document.getElementById('nssf-staff').value, amount: parseFloat(document.getElementById('nssf-amount').value), timestamp: Date.now() };
             let docId = editId;
@@ -1390,7 +1395,7 @@
             const editId = document.getElementById('don-edit-id').value;
             const fileInput = document.getElementById('don-file');
             for (const file of fileInput.files) {
-                if (file.size > 1073741824) { showNotification(`File "${file.name}" exceeds 1GB limit.`, 'error'); return; }
+                if (file.size > 524288) { showNotification(`File "${file.name}" exceeds 500KB limit.`, 'error'); return; }
             }
             const data = { staffId: document.getElementById('don-id').value, name: document.getElementById('don-name').value, campus: document.getElementById('don-campus').value, status: document.getElementById('don-status').value, type: document.getElementById('don-type').value, amount: parseFloat(document.getElementById('don-amount').value), date: document.getElementById('don-date').value, timestamp: Date.now() };
             let docId = editId;
