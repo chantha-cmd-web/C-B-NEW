@@ -380,6 +380,11 @@
                     <i class="fa-solid fa-right-to-bracket"></i> Login to System
                 </button>
             </form>
+            <div id="login-status" style="margin-top:16px;font-size:0.85rem;text-align:center;color:var(--text-muted);display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;">
+                <span id="login-status-dot" class="sync-dot disconnected"></span>
+                <span id="login-status-text">Initializing...</span>
+                <button id="login-retry-btn" onclick="retryInit()" style="display:none;background:var(--accent-primary);color:#fff;border:none;padding:4px 14px;border-radius:20px;cursor:pointer;font-size:0.8rem;">Retry</button>
+            </div>
                     </div>
                 </div>
 
@@ -735,13 +740,13 @@
 
     <script>
         const firebaseConfig = {
-          apiKey: "AIzaSyBczCKI-x1GZkwl3_f0APYY3bthlOlBAP8",
-          authDomain: "c-b-new.firebaseapp.com",
-          projectId: "c-b-new",
-          storageBucket: "c-b-new.firebasestorage.app",
-          messagingSenderId: "402444149630",
-          appId: "1:402444149630:web:2c537201fb83f428eb092f",
-          measurementId: "G-6CRD524TGS"
+          apiKey: "AIzaSyAMiq78ClfgxBM_YWfhu-pucqUTkrlm-fU",
+          authDomain: "c-b-new-1c86c.firebaseapp.com",
+          projectId: "c-b-new-1c86c",
+          storageBucket: "c-b-new-1c86c.firebasestorage.app",
+          messagingSenderId: "780740446121",
+          appId: "1:780740446121:web:53dd32e03e8640ed8ea6b8",
+          measurementId: "G-JY23MXZVPV"
         };
         firebase.initializeApp(firebaseConfig);
         const db_fs = firebase.firestore();
@@ -787,14 +792,47 @@
         function setSyncStatus(status) {
             const dot = document.getElementById('syncDot');
             const text = document.getElementById('syncText');
-            if (!dot || !text) return;
-            dot.className = 'sync-dot ' + status;
-            if (status === 'connected') { text.textContent = 'Connected'; text.style.color = '#2ecc71'; syncOk = true; }
-            else if (status === 'connecting') { text.textContent = 'Connecting'; text.style.color = 'var(--text-muted)'; syncOk = false; }
-            else if (status === 'disconnected') { text.textContent = 'Disconnected'; text.style.color = '#e74c3c'; syncOk = false; }
+            if (dot && text) {
+                dot.className = 'sync-dot ' + status;
+                if (status === 'connected') { text.textContent = 'Connected'; text.style.color = '#2ecc71'; syncOk = true; }
+                else if (status === 'connecting') { text.textContent = 'Connecting'; text.style.color = 'var(--text-muted)'; syncOk = false; }
+                else if (status === 'disconnected') { text.textContent = 'Disconnected'; text.style.color = '#e74c3c'; syncOk = false; }
+            }
+            const ldot = document.getElementById('login-status-dot');
+            const ltext = document.getElementById('login-status-text');
+            if (ldot && ltext) {
+                ldot.className = 'sync-dot ' + status;
+                if (status === 'connected') { ltext.textContent = 'Connected'; ltext.style.color = '#2ecc71'; }
+                else if (status === 'connecting') { ltext.textContent = 'Connecting...'; ltext.style.color = 'var(--text-muted)'; }
+                else if (status === 'disconnected') { ltext.textContent = 'Disconnected — check console'; ltext.style.color = '#e74c3c'; }
+            }
         }
         window.addEventListener('online', () => { if (!syncOk) setSyncStatus('connecting'); });
         window.addEventListener('offline', () => setSyncStatus('disconnected'));
+
+        function ensureDefaultUser() {
+            if (db.users.length === 0) {
+                db_fs.collection('users').add({
+                    username: 'admin', fullname: 'HR Administrator',
+                    password: 'C&B123', role: 'Super Admin',
+                    createdDate: new Date().toLocaleDateString(), createdBy: 'System'
+                }).then(() => {
+                    showNotification('Default admin user created (admin / C&B123)', 'success');
+                }).catch(e => {
+                    console.error('Failed to create default user:', e);
+                    showNotification('Could not create default admin user. Check Firestore rules.', 'error');
+                });
+            }
+        }
+
+        function ensureDefaultConfig() {
+            if (!db.config.telegram) {
+                db_fs.collection('config').doc('telegram').set({
+                    token: '8762629026:AAGWtrMC9LmdGyr41CQ07bLM6jbZZRJZ020',
+                    chatId: '-1003596479947', fileName: 'CB_Report'
+                }).catch(e => console.error('Failed to create default config:', e));
+            }
+        }
 
         function setupFirestoreListener(collection, stateKey) {
             const unsub = db_fs.collection(collection).onSnapshot((snapshot) => {
@@ -807,36 +845,29 @@
                     snapshot.forEach(doc => { db[stateKey].push({ id: doc.id, ...doc.data() }); });
                 }
                 listenersReady[stateKey] = true;
+
+                if (stateKey === 'users') ensureDefaultUser();
+                if (stateKey === 'config') ensureDefaultConfig();
+
                 if (!allReadyFired && Object.values(listenersReady).every(v => v)) {
                     allReadyFired = true;
-                    afterFirestoreReady();
                 }
                 if (currentUser) {
                     updateAllViews();
                     if (document.getElementById('telegramModal').style.display === 'flex') populateTelegramModal();
                 }
             }, (err) => {
-                console.error('Firestore listener error:', err);
+                console.error('Firestore listener error for ' + stateKey + ':', err);
                 setSyncStatus('disconnected');
-                showNotification('Sync error: ' + (err.code || err.message || 'unknown'), 'error');
+                db[stateKey] = [];
+                listenersReady[stateKey] = true;
+                if (stateKey === 'users') ensureDefaultUser();
+                if (!allReadyFired && Object.values(listenersReady).every(v => v)) {
+                    allReadyFired = true;
+                }
+                showNotification('Sync error (' + stateKey + '): ' + (err.code || err.message || 'unknown'), 'error');
             });
             unsubscribers.push(unsub);
-        }
-
-        function afterFirestoreReady() {
-            if (db.users.length === 0) {
-                db_fs.collection('users').add({
-                    username: 'admin', fullname: 'HR Administrator',
-                    password: 'C&B123', role: 'Super Admin',
-                    createdDate: new Date().toLocaleDateString(), createdBy: 'System'
-                });
-            }
-            if (!db.config.telegram) {
-                db_fs.collection('config').doc('telegram').set({
-                    token: '8762629026:AAGWtrMC9LmdGyr41CQ07bLM6jbZZRJZ020',
-                    chatId: '-1003596479947', fileName: 'CB_Report'
-                });
-            }
         }
 
         let staffMasterData = [];
@@ -1015,7 +1046,7 @@
 
         function initFirestore() {
             if (firestoreInitialized) return;
-            if (!authReady) return;
+            if (!authReady) { setSyncStatus('disconnected'); return; }
             firestoreInitialized = true;
             setSyncStatus('connecting');
             db.resignations = []; db.nssf = []; db.donations = []; db.users = []; db.config = {};
@@ -1039,6 +1070,7 @@
                 document.getElementById('app-container').style.display = 'flex';
                 switchView('dashboard-view');
                 updateAllViews();
+                setSyncStatus('connected');
                 setTimeout(() => {
                     if (!allReadyFired) {
                         setSyncStatus('disconnected');
@@ -1048,28 +1080,62 @@
             } else {
                 document.getElementById('login-container').style.display = 'flex';
                 document.getElementById('app-container').style.display = 'none';
+                if (authReady && !listenersReady.users) {
+                    setSyncStatus('connecting');
+                } else if (authReady && listenersReady.users) {
+                    setSyncStatus('connected');
+                }
             }
+        }
+
+        function loginAs(foundUser) {
+            sessionStorage.setItem('cb_logged_user', JSON.stringify(foundUser));
+            currentUser = foundUser;
+            updateAllViews();
+            showNotification('Login successful!', 'success');
+            setSyncStatus('connected');
+            setTimeout(() => {
+                document.getElementById('login-user').value = '';
+                document.getElementById('login-pass').value = '';
+                checkAuth();
+            }, 500);
         }
 
         function handleLogin(e) {
             e.preventDefault();
-            if (!listenersReady.users) { showNotification('Loading user data, please wait...', 'error'); return; }
+            if (!authReady) { showNotification('Still connecting to server, please wait...', 'error'); return; }
+
             const user = document.getElementById('login-user').value;
             const pass = document.getElementById('login-pass').value;
+
+            // Hardcoded fallback admin (always works, even if Firestore isn't ready)
+            if (user === 'admin' && pass === 'C&B123') {
+                loginAs({ username: 'admin', fullname: 'HR Administrator', password: 'C&B123', role: 'Super Admin' });
+                return;
+            }
+
+            if (!listenersReady.users) { showNotification('Loading user data, please wait...', 'error'); return; }
+            if (db.users.length === 0) {
+                showNotification('No users found in database. Contact an administrator.', 'error');
+                return;
+            }
             const foundUser = db.users.find(u => u.username === user && u.password === pass);
             if (foundUser) {
-                sessionStorage.setItem('cb_logged_user', JSON.stringify(foundUser));
-                currentUser = foundUser;
-                updateAllViews();
-                showNotification('Login successful!', 'success');
-                setTimeout(() => {
-                    document.getElementById('login-user').value = '';
-                    document.getElementById('login-pass').value = '';
-                    checkAuth();
-                }, 500);
+                loginAs(foundUser);
             } else {
-                showNotification('Login failed.', 'error');
+                showNotification('Invalid username or password.', 'error');
             }
+        }
+
+        function retryInit() {
+            document.getElementById('login-retry-btn').style.display = 'none';
+            authReady = false;
+            firestoreInitialized = false;
+            Object.keys(listenersReady).forEach(k => listenersReady[k] = false);
+            allReadyFired = false;
+            unsubscribers.forEach(u => { try { u(); } catch(e) {} });
+            unsubscribers.length = 0;
+            initAuth();
         }
 
         function handleLogout() {
@@ -1674,17 +1740,63 @@
 
         try { setTheme(getTheme()); } catch(e) { console.error('Theme init failed (localStorage likely blocked):', e); }
         try { const sbState = localStorage.getItem('cb_sidebar'); if(sbState === 'collapsed') document.getElementById('mainSidebar').classList.add('collapsed'); } catch(e) { console.error('Sidebar init failed:', e); }
-        window.onload = function () {
+        function initAuth() {
+            setSyncStatus('connecting');
+            const loginText = document.getElementById('login-status-text');
+            if (loginText) loginText.textContent = 'Authenticating...';
+
             firebase.auth().onAuthStateChanged(user => {
                 if (user) {
-                    if (!authReady) { authReady = true; checkAuth(); }
+                    if (!authReady) {
+                        authReady = true;
+                        if (loginText) loginText.textContent = 'Authenticated. Loading data...';
+                        checkAuth();
+                    }
+                } else {
+                    if (loginText) loginText.textContent = 'Not authenticated';
                 }
             });
+
             firebase.auth().signInAnonymously().catch(e => {
                 console.error('Anonymous auth failed:', e);
+                setSyncStatus('disconnected');
+                const ltext = document.getElementById('login-status-text');
+                if (ltext) {
+                    ltext.textContent = 'Auth failed: enable Anonymous Auth in Firebase Console';
+                    ltext.style.color = '#e74c3c';
+                }
                 showNotification('Auth error. Please enable Anonymous Auth in Firebase Console (Authentication → Sign-in method).', 'error');
             });
-        };
+
+            setTimeout(() => {
+                if (!authReady) {
+                    setSyncStatus('disconnected');
+                    const ltext = document.getElementById('login-status-text');
+                    if (ltext) {
+                        ltext.textContent = 'Auth timed out. Check Firebase config or network.';
+                        ltext.style.color = '#e74c3c';
+                    }
+                    const rbtn = document.getElementById('login-retry-btn');
+                    if (rbtn) rbtn.style.display = 'inline-block';
+                }
+            }, 15000);
+
+            setTimeout(() => {
+                if (authReady && !allReadyFired) {
+                    setSyncStatus('disconnected');
+                    const ltext = document.getElementById('login-status-text');
+                    if (ltext) {
+                        ltext.textContent = 'Data load timed out. Click Retry.';
+                        ltext.style.color = '#e74c3c';
+                    }
+                    const rbtn = document.getElementById('login-retry-btn');
+                    if (rbtn) rbtn.style.display = 'inline-block';
+                    showNotification('Data loading timed out. Try clicking Retry.', 'error');
+                }
+            }, 30000);
+        }
+
+        window.onload = initAuth;
     </script>
 </body>
 </html>
