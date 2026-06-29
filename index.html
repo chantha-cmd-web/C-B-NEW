@@ -1312,7 +1312,7 @@
             const editId = document.getElementById('res-edit-id').value;
             const fileInput = document.getElementById('res-file');
             for (const file of fileInput.files) {
-                if (file.size > 524288) { showNotification(`File "${file.name}" exceeds 500KB limit.`, 'error'); return; }
+                if (file.size > 716800) { showNotification(`File "${file.name}" exceeds 700KB limit (Base64 ~1MB Firestore limit).`, 'error'); return; }
             }
             const data = { staffId: document.getElementById('res-id').value, name: document.getElementById('res-name').value, nationality: document.getElementById('res-nationality').value, campus: document.getElementById('res-campus').value, department: document.getElementById('res-department').value, position: document.getElementById('res-position').value, status: document.getElementById('res-status').value, reason: document.getElementById('res-reason').value, start: document.getElementById('res-start').value, end: document.getElementById('res-end').value, clearance: document.getElementById('res-clearance').value, timestamp: Date.now() };
             let docId = editId;
@@ -1354,7 +1354,7 @@
             const fileInput = document.getElementById('nssf-file');
             if (fileInput.files.length === 0 && !editId) { showNotification('Please attach an NSSF PDF file.','error'); return; }
             for (const file of fileInput.files) {
-                if (file.size > 524288) { showNotification(`File "${file.name}" exceeds 500KB limit.`, 'error'); return; }
+                if (file.size > 716800) { showNotification(`File "${file.name}" exceeds 700KB limit (Base64 ~1MB Firestore limit).`, 'error'); return; }
             }
             const data = { month: document.getElementById('nssf-month').value, year: document.getElementById('nssf-year').value, staff: document.getElementById('nssf-staff').value, amount: parseFloat(document.getElementById('nssf-amount').value), timestamp: Date.now() };
             let docId = editId;
@@ -1394,7 +1394,7 @@
             const editId = document.getElementById('don-edit-id').value;
             const fileInput = document.getElementById('don-file');
             for (const file of fileInput.files) {
-                if (file.size > 524288) { showNotification(`File "${file.name}" exceeds 500KB limit.`, 'error'); return; }
+                if (file.size > 716800) { showNotification(`File "${file.name}" exceeds 700KB limit (Base64 ~1MB Firestore limit).`, 'error'); return; }
             }
             const data = { staffId: document.getElementById('don-id').value, name: document.getElementById('don-name').value, campus: document.getElementById('don-campus').value, status: document.getElementById('don-status').value, type: document.getElementById('don-type').value, amount: parseFloat(document.getElementById('don-amount').value), date: document.getElementById('don-date').value, timestamp: Date.now() };
             let docId = editId;
