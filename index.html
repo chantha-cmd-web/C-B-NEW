@@ -1190,22 +1190,18 @@
         }
 
         async function uploadFilesToStorage(files, collection, docId) {
-            console.log('[UPLOAD] called with', files ? files.length : 0, 'files, collection:', collection, 'docId:', docId);
-            if (!files || files.length === 0) { console.warn('[UPLOAD] no files to process'); return []; }
+            if (!files || files.length === 0) return [];
             const uploaded = [];
             const fileArray = Array.from(files);
             for (const file of fileArray) {
                 try {
-                    console.log('[UPLOAD] reading file:', file.name, 'size:', file.size);
                     const dataUrl = await readFileAsBase64(file);
-                    console.log('[UPLOAD] file read OK, dataUrl length:', dataUrl.length);
                     uploaded.push({ name: file.name, data: dataUrl });
                 } catch (e) {
-                    console.error('[UPLOAD] File read failed:', e);
+                    console.error('Upload failed:', e);
                     showNotification(`Failed to upload "${file.name}": ${e.message}`, 'error');
                 }
             }
-            console.log('[UPLOAD] returning', uploaded.length, 'files');
             return uploaded;
         }
 
@@ -1315,7 +1311,6 @@
             e.preventDefault();
             const editId = document.getElementById('res-edit-id').value;
             const fileInput = document.getElementById('res-file');
-            console.log('[RES-SUBMIT] fileInput exists:', !!fileInput, 'files.length:', fileInput ? fileInput.files.length : -1);
             for (const file of fileInput.files) {
                 if (file.size > 524288) { showNotification(`File "${file.name}" exceeds 500KB limit.`, 'error'); return; }
             }
@@ -1330,27 +1325,15 @@
                     docId = docRef.id;
                     showNotification('Record added.');
                 }
-                console.log('[RES-SUBMIT] after save, fileInput.files.length:', fileInput.files.length);
                 if (fileInput.files.length > 0) {
                     if (editId) await deleteStorageFiles('resignations', editId);
                     const files = await uploadFilesToStorage(fileInput.files, 'resignations', docId);
-                    console.log('[RES-SUBMIT] uploadFilesToStorage returned', files.length, 'files');
                     if (files.length > 0) {
-                        try {
-                            await db_fs.collection('resignations').doc(docId).set({ files, fileData: null }, { merge: true });
-                            console.log('[RES-SUBMIT] files saved to Firestore successfully');
-                        } catch (fsErr) {
-                            console.error('[RES-SUBMIT] Firestore file save failed:', fsErr);
-                            showNotification('Error saving files: ' + fsErr.message, 'error');
-                        }
-                    } else {
-                        console.warn('[RES-SUBMIT] no files returned from upload, skipping Firestore save');
+                        await db_fs.collection('resignations').doc(docId).set({ files, fileData: null }, { merge: true });
                     }
-                } else {
-                    console.log('[RES-SUBMIT] no files to upload (length=0)');
                 }
             } catch (e) {
-                console.error('[RES-SUBMIT] Outer catch - Submit failed:', e);
+                console.error('Submit failed:', e);
                 showNotification('Error saving record: ' + e.message, 'error');
                 return;
             }

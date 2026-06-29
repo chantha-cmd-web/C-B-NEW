@@ -1192,7 +1192,8 @@
         async function uploadFilesToStorage(files, collection, docId) {
             if (!files || files.length === 0) return [];
             const uploaded = [];
-            for (const file of files) {
+            const fileArray = Array.from(files);
+            for (const file of fileArray) {
                 try {
                     const dataUrl = await readFileAsBase64(file);
                     uploaded.push({ name: file.name, data: dataUrl });
