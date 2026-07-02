@@ -505,6 +505,10 @@
                                         <input type="file" id="res-file" accept=".pdf" multiple onchange="updateFileLabel(this, 'res-file-label')">
                                     </div>
                                 </div>
+                                <div class="form-group full-width">
+                                    <label>Or OneDrive Link</label>
+                                    <input type="url" id="res-onedrive" class="form-control" placeholder="Paste OneDrive share link...">
+                                </div>
                             </div>
                             <div style="display: flex; gap: 10px;">
                                 <button type="submit" class="btn btn-primary" id="res-submit-btn"><i class="fa-solid fa-save"></i> Save Record</button>
@@ -546,6 +550,10 @@
                                 <div class="form-group full-width">
                                     <label>Upload NSSF File (PDF)</label>
                                     <div class="file-upload-wrapper"><div class="file-upload-btn" id="nssf-file-label"><i class="fa-solid fa-cloud-arrow-up"></i> Click here to Upload NSSF PDF</div><input type="file" id="nssf-file" accept=".pdf" multiple onchange="updateFileLabel(this, 'nssf-file-label')"></div>
+                                </div>
+                                <div class="form-group full-width">
+                                    <label>Or OneDrive Link</label>
+                                    <input type="url" id="nssf-onedrive" class="form-control" placeholder="Paste OneDrive share link...">
                                 </div>
                             </div>
                             <div style="display: flex; gap: 10px;">
@@ -595,6 +603,10 @@
                                 <div class="form-group full-width">
                                     <label>Attach Proof (PDF)</label>
                                     <div class="file-upload-wrapper"><div class="file-upload-btn" id="don-file-label"><i class="fa-solid fa-cloud-arrow-up"></i> Click here to Upload PDF Proof</div><input type="file" id="don-file" accept=".pdf" multiple onchange="updateFileLabel(this, 'don-file-label')"></div>
+                                </div>
+                                <div class="form-group full-width">
+                                    <label>Or OneDrive Link</label>
+                                    <input type="url" id="don-onedrive" class="form-control" placeholder="Paste OneDrive share link...">
                                 </div>
                             </div>
                             <div style="display: flex; gap: 10px;">
@@ -1227,17 +1239,22 @@
                 listEl.innerHTML = record.files.map((f, i) => {
                     const src = f.data || f.url || '';
                     const safeSrc = src.replace(/'/g, "\\'");
+                    if (f.url) {
+                        return `<button onclick="window.open('${safeSrc}','_blank')" style="padding:4px 12px;border-radius:8px;border:1px solid var(--glass-border);background:var(--input-bg);color:var(--text-primary);cursor:pointer;font-size:0.8rem;"><i class="fa-solid fa-external-link-alt" style="color:var(--accent-primary);"></i> ${f.name}</button>`;
+                    }
                     return `<button data-src="${safeSrc}" style="padding:4px 12px;border-radius:8px;border:1px solid var(--glass-border);background:var(--input-bg);color:var(--text-primary);cursor:pointer;font-size:0.8rem;"><i class="fa-solid fa-file-pdf" style="color:var(--danger);"></i> ${f.name}</button>`;
                 }).join('');
-                listEl.querySelectorAll('button').forEach((btn, i) => {
+                listEl.querySelectorAll('button[data-src]').forEach((btn, i) => {
                     btn.onclick = function() {
                         embedEl.src = this.dataset.src;
                         listEl.querySelectorAll('button').forEach(b => b.style.outline = 'none');
                         this.style.outline = '2px solid var(--accent-primary)';
                     };
                 });
-                embedEl.src = record.files[0].data || record.files[0].url || '';
-                if (listEl.firstChild) listEl.firstChild.style.outline = '2px solid var(--accent-primary)';
+                if (record.files[0].data) {
+                    embedEl.src = record.files[0].data;
+                    if (listEl.firstChild) listEl.firstChild.style.outline = '2px solid var(--accent-primary)';
+                }
                 document.getElementById('pdfModal').style.display = 'flex';
             } else {
                 showNotification('No PDF file attached to this record.', 'error');
@@ -1325,18 +1342,23 @@
                     docId = docRef.id;
                     showNotification('Record added.');
                 }
+                let files = [];
                 if (fileInput.files.length > 0) {
-                    const files = await uploadFilesToStorage(fileInput.files, 'resignations', docId);
-                    if (files.length > 0) {
-                        await db_fs.collection('resignations').doc(docId).set({ files, fileData: null }, { merge: true });
-                    }
+                    files = await uploadFilesToStorage(fileInput.files, 'resignations', docId);
+                }
+                const onedriveLink = document.getElementById('res-onedrive').value.trim();
+                if (onedriveLink) {
+                    files.push({ name: 'OneDrive Document', url: onedriveLink });
+                }
+                if (files.length > 0) {
+                    await db_fs.collection('resignations').doc(docId).set({ files, fileData: null }, { merge: true });
                 }
             } catch (e) {
                 console.error('Submit failed:', e);
                 showNotification('Error saving record: ' + e.message, 'error');
                 return;
             }
-            document.getElementById('resignation-form').reset(); document.getElementById('res-edit-id').value = ''; document.getElementById('res-file-label').innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> Click here to Upload PDF'; document.getElementById('res-campus').value = ''; document.getElementById('res-form-title').innerText = 'Add New Record'; document.getElementById('res-submit-btn').innerHTML = '<i class="fa-solid fa-save"></i> Save Record'; document.getElementById('res-cancel-btn').style.display = 'none';
+            document.getElementById('resignation-form').reset(); document.getElementById('res-edit-id').value = ''; document.getElementById('res-file-label').innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> Click here to Upload PDF'; document.getElementById('res-campus').value = ''; document.getElementById('res-onedrive').value = ''; document.getElementById('res-form-title').innerText = 'Add New Record'; document.getElementById('res-submit-btn').innerHTML = '<i class="fa-solid fa-save"></i> Save Record'; document.getElementById('res-cancel-btn').style.display = 'none';
         }
 
         function renderResignations() {
@@ -1345,14 +1367,15 @@
             if(f.search) data = data.filter(r => r.staffId?.toLowerCase().includes(f.search)||r.name?.toLowerCase().includes(f.search)||r.position?.toLowerCase().includes(f.search));
             if(f.reason) data = data.filter(r => r.reason === f.reason);
             if(f.clearance) data = data.filter(r => r.clearance === f.clearance);
-            document.getElementById('resignation-table-body').innerHTML = data.map(r => `<tr><td><strong>${r.staffId}</strong></td><td>${r.name}</td><td>${r.position}</td><td><span class="badge badge-cyan">${r.campus||'-'}</span></td><td>${r.department||'-'}</td><td>${r.nationality||'-'}</td><td>${r.status||'-'}</td><td>${r.reason||'-'}</td><td>${r.end}</td><td><span class="badge ${r.clearance==='Yes'?'badge-success':'badge-warning'}">${r.clearance==='Yes'?'Cleared':'Pending'}</span></td><td>${hasFiles(r)?`<i class="fa-solid fa-file-pdf" style="color:var(--danger);font-size:1.2rem;"></i>${r.files&&r.files.length>1?' ('+r.files.length+')':''}`:'-'}</td><td><div class="action-btns"><button class="btn btn-primary btn-sm" onclick="editRecord('resignations','${r.id}','res')"><i class="fa-solid fa-pen-to-square"></i></button><button class="btn btn-gray btn-sm" onclick="openPdfViewer('resignations','${r.id}')"><i class="fa-solid fa-eye"></i></button><button class="btn btn-danger btn-sm" onclick="deleteRecord('resignations','${r.id}')"><i class="fa-solid fa-trash"></i></button></div></td></tr>`).join('')||'<tr><td colspan="12" style="text-align:center;padding:20px;">No records found.</td></tr>';
+            document.getElementById('resignation-table-body').innerHTML = data.map(r => `<tr><td><strong>${r.staffId}</strong></td><td>${r.name}</td><td>${r.position}</td><td><span class="badge badge-cyan">${r.campus||'-'}</span></td><td>${r.department||'-'}</td><td>${r.nationality||'-'}</td><td>${r.status||'-'}</td><td>${r.reason||'-'}</td><td>${r.end}</td><td><span class="badge ${r.clearance==='Yes'?'badge-success':'badge-warning'}">${r.clearance==='Yes'?'Cleared':'Pending'}</span></td><td>${hasFiles(r)?`${r.files&&r.files.some(f=>f.url)?'<i class="fa-solid fa-link" style="color:var(--accent-primary);font-size:1.2rem;"></i>':'<i class="fa-solid fa-file-pdf" style="color:var(--danger);font-size:1.2rem;"></i>'}${r.files&&r.files.length>1?' ('+r.files.length+')':''}`:'-'}</td><td><div class="action-btns"><button class="btn btn-primary btn-sm" onclick="editRecord('resignations','${r.id}','res')"><i class="fa-solid fa-pen-to-square"></i></button><button class="btn btn-gray btn-sm" onclick="openPdfViewer('resignations','${r.id}')"><i class="fa-solid fa-eye"></i></button><button class="btn btn-danger btn-sm" onclick="deleteRecord('resignations','${r.id}')"><i class="fa-solid fa-trash"></i></button></div></td></tr>`).join('')||'<tr><td colspan="12" style="text-align:center;padding:20px;">No records found.</td></tr>';
         }
 
         async function handleNssfSubmit(e) {
             e.preventDefault();
             const editId = document.getElementById('nssf-edit-id').value;
             const fileInput = document.getElementById('nssf-file');
-            if (fileInput.files.length === 0 && !editId) { showNotification('Please attach an NSSF PDF file.','error'); return; }
+            const nssfLink = document.getElementById('nssf-onedrive').value.trim();
+            if (fileInput.files.length === 0 && !nssfLink && !editId) { showNotification('Please attach a file or provide a OneDrive link.','error'); return; }
             for (const file of fileInput.files) {
                 if (file.size > 819200) { showNotification(`File "${file.name}" exceeds 800KB limit (Base64 ~1MB Firestore limit).`, 'error'); return; }
             }
@@ -1367,11 +1390,15 @@
                     docId = docRef.id;
                     showNotification('Record uploaded.');
                 }
+                let files = [];
                 if (fileInput.files.length > 0) {
-                    const files = await uploadFilesToStorage(fileInput.files, 'nssf', docId);
-                    if (files.length > 0) {
-                        await db_fs.collection('nssf').doc(docId).set({ files, fileData: null }, { merge: true });
-                    }
+                    files = await uploadFilesToStorage(fileInput.files, 'nssf', docId);
+                }
+                if (nssfLink) {
+                    files.push({ name: 'OneDrive Document', url: nssfLink });
+                }
+                if (files.length > 0) {
+                    await db_fs.collection('nssf').doc(docId).set({ files, fileData: null }, { merge: true });
                 }
             } catch (e) {
                 console.error('NSSF submit failed:', e);
@@ -1386,7 +1413,7 @@
             const f = currentFilters.nssf;
             if(f.search) data = data.filter(r => r.year.toString().includes(f.search));
             if(f.month) data = data.filter(r => r.month === f.month);
-            document.getElementById('nssf-table-body').innerHTML = data.map(n => `<tr><td><strong>${n.month} ${n.year}</strong></td><td>${n.staff}</td><td>$${parseFloat(n.amount).toFixed(2)}</td><td>${hasFiles(n)?`<i class="fa-solid fa-file-pdf" style="color:var(--danger);font-size:1.2rem;"></i>${n.files&&n.files.length>1?' ('+n.files.length+')':''} ${n.files?n.files[0].name:(n.filename||'')}`:'-'}</td><td><div class="action-btns"><button class="btn btn-primary btn-sm" onclick="editRecord('nssf','${n.id}','nssf')"><i class="fa-solid fa-pen-to-square"></i></button><button class="btn btn-gray btn-sm" onclick="openPdfViewer('nssf','${n.id}')"><i class="fa-solid fa-eye"></i></button><button class="btn btn-danger btn-sm" onclick="deleteRecord('nssf','${n.id}')"><i class="fa-solid fa-trash"></i></button></div></td></tr>`).join('')||'<tr><td colspan="5" style="text-align:center;padding:20px;">No records found.</td></tr>';
+            document.getElementById('nssf-table-body').innerHTML = data.map(n => `<tr><td><strong>${n.month} ${n.year}</strong></td><td>${n.staff}</td><td>$${parseFloat(n.amount).toFixed(2)}</td><td>${hasFiles(n)?`${n.files&&n.files.some(f=>f.url)?'<i class="fa-solid fa-link" style="color:var(--accent-primary);font-size:1.2rem;"></i>':'<i class="fa-solid fa-file-pdf" style="color:var(--danger);font-size:1.2rem;"></i>'}${n.files&&n.files.length>1?' ('+n.files.length+')':''} ${n.files?n.files[0].name:(n.filename||'')}`:'-'}</td><td><div class="action-btns"><button class="btn btn-primary btn-sm" onclick="editRecord('nssf','${n.id}','nssf')"><i class="fa-solid fa-pen-to-square"></i></button><button class="btn btn-gray btn-sm" onclick="openPdfViewer('nssf','${n.id}')"><i class="fa-solid fa-eye"></i></button><button class="btn btn-danger btn-sm" onclick="deleteRecord('nssf','${n.id}')"><i class="fa-solid fa-trash"></i></button></div></td></tr>`).join('')||'<tr><td colspan="5" style="text-align:center;padding:20px;">No records found.</td></tr>';
         }
 
         async function handleDonationSubmit(e) {
@@ -1407,18 +1434,23 @@
                     docId = docRef.id;
                     showNotification('Record saved.');
                 }
+                let files = [];
                 if (fileInput.files.length > 0) {
-                    const files = await uploadFilesToStorage(fileInput.files, 'donations', docId);
-                    if (files.length > 0) {
-                        await db_fs.collection('donations').doc(docId).set({ files, fileData: null }, { merge: true });
-                    }
+                    files = await uploadFilesToStorage(fileInput.files, 'donations', docId);
+                }
+                const onedriveLink = document.getElementById('don-onedrive').value.trim();
+                if (onedriveLink) {
+                    files.push({ name: 'OneDrive Document', url: onedriveLink });
+                }
+                if (files.length > 0) {
+                    await db_fs.collection('donations').doc(docId).set({ files, fileData: null }, { merge: true });
                 }
             } catch (e) {
                 console.error('Donation submit failed:', e);
                 showNotification('Error saving donation: ' + e.message, 'error');
                 return;
             }
-            document.getElementById('donation-form').reset(); document.getElementById('don-edit-id').value = ''; document.getElementById('don-file-label').innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> Click here to Upload PDF'; document.getElementById('don-campus').value = ''; document.getElementById('don-form-title').innerText = 'Add Donation Record'; document.getElementById('don-submit-btn').innerHTML = '<i class="fa-solid fa-save"></i> Save Record'; document.getElementById('don-cancel-btn').style.display = 'none';
+            document.getElementById('donation-form').reset(); document.getElementById('don-edit-id').value = ''; document.getElementById('don-file-label').innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> Click here to Upload PDF'; document.getElementById('don-campus').value = ''; document.getElementById('don-onedrive').value = ''; document.getElementById('don-form-title').innerText = 'Add Donation Record'; document.getElementById('don-submit-btn').innerHTML = '<i class="fa-solid fa-save"></i> Save Record'; document.getElementById('don-cancel-btn').style.display = 'none';
         }
 
         function renderDonations() {
@@ -1426,7 +1458,7 @@
             const f = currentFilters.don;
             if(f.search) data = data.filter(r => r.staffId?.toLowerCase().includes(f.search)||r.name?.toLowerCase().includes(f.search));
             if(f.type) data = data.filter(r => r.type === f.type);
-            document.getElementById('donation-table-body').innerHTML = data.map(d => `<tr><td><strong>${d.staffId}</strong></td><td>${d.name}</td><td><span class="badge badge-cyan">${d.campus||'-'}</span></td><td><span class="badge badge-gray">${d.type}</span></td><td style="color:var(--success);font-weight:bold;">$${parseFloat(d.amount).toFixed(2)}</td><td>${d.date}</td><td>${hasFiles(d)?`<i class="fa-solid fa-file-pdf" style="color:var(--danger);font-size:1.2rem;"></i>${d.files&&d.files.length>1?' ('+d.files.length+')':''}`:'-'}</td><td><div class="action-btns"><button class="btn btn-primary btn-sm" onclick="editRecord('donations','${d.id}','don')"><i class="fa-solid fa-pen-to-square"></i></button><button class="btn btn-gray btn-sm" onclick="openPdfViewer('donations','${d.id}')"><i class="fa-solid fa-eye"></i></button><button class="btn btn-danger btn-sm" onclick="deleteRecord('donations','${d.id}')"><i class="fa-solid fa-trash"></i></button></div></td></tr>`).join('')||'<tr><td colspan="8" style="text-align:center;padding:20px;">No records found.</td></tr>';
+            document.getElementById('donation-table-body').innerHTML = data.map(d => `<tr><td><strong>${d.staffId}</strong></td><td>${d.name}</td><td><span class="badge badge-cyan">${d.campus||'-'}</span></td><td><span class="badge badge-gray">${d.type}</span></td><td style="color:var(--success);font-weight:bold;">$${parseFloat(d.amount).toFixed(2)}</td><td>${d.date}</td><td>${hasFiles(d)?`${d.files&&d.files.some(f=>f.url)?'<i class="fa-solid fa-link" style="color:var(--accent-primary);font-size:1.2rem;"></i>':'<i class="fa-solid fa-file-pdf" style="color:var(--danger);font-size:1.2rem;"></i>'}${d.files&&d.files.length>1?' ('+d.files.length+')':''}`:'-'}</td><td><div class="action-btns"><button class="btn btn-primary btn-sm" onclick="editRecord('donations','${d.id}','don')"><i class="fa-solid fa-pen-to-square"></i></button><button class="btn btn-gray btn-sm" onclick="openPdfViewer('donations','${d.id}')"><i class="fa-solid fa-eye"></i></button><button class="btn btn-danger btn-sm" onclick="deleteRecord('donations','${d.id}')"><i class="fa-solid fa-trash"></i></button></div></td></tr>`).join('')||'<tr><td colspan="8" style="text-align:center;padding:20px;">No records found.</td></tr>';
         }
 
         async function deleteRecord(collection, id) {
@@ -1450,13 +1482,19 @@
                 document.getElementById('res-department').value = record.department||'Academic'; document.getElementById('res-position').value = record.position;
                 document.getElementById('res-status').value = record.status||'Full-time'; document.getElementById('res-reason').value = record.reason||'Resign';
                 document.getElementById('res-start').value = record.start; document.getElementById('res-end').value = record.end; document.getElementById('res-clearance').value = record.clearance;
+                const resLink = record.files?.find(f => f.url)?.url || '';
+                document.getElementById('res-onedrive').value = resLink;
             } else if(prefix === 'nssf') {
                 document.getElementById('nssf-month').value = record.month; document.getElementById('nssf-year').value = record.year;
                 document.getElementById('nssf-staff').value = record.staff; document.getElementById('nssf-amount').value = record.amount;
+                const nssfLink = record.files?.find(f => f.url)?.url || '';
+                document.getElementById('nssf-onedrive').value = nssfLink;
             } else if(prefix === 'don') {
                 document.getElementById('don-id').value = record.staffId; document.getElementById('don-name').value = record.name;
                 document.getElementById('don-campus').value = record.campus||'CEN'; document.getElementById('don-status').value = record.status||'Full-time';
                 document.getElementById('don-type').value = record.type; document.getElementById('don-amount').value = record.amount; document.getElementById('don-date').value = record.date;
+                const donLink = record.files?.find(f => f.url)?.url || '';
+                document.getElementById('don-onedrive').value = donLink;
             }
             document.getElementById(`${prefix}-form-title`).innerText = 'Edit Record';
             document.getElementById(`${prefix}-submit-btn`).innerHTML = '<i class="fa-solid fa-pen-to-square"></i> Update Record';
@@ -1470,6 +1508,7 @@
             document.getElementById(fid).reset();
             document.getElementById(`${prefix}-edit-id`).value = '';
             document.getElementById(`${prefix}-file-label`).innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> Click here to Upload PDF';
+            document.getElementById(`${prefix}-onedrive`).value = '';
             if(prefix === 'res') document.getElementById('res-campus').value = '';
             if(prefix === 'don') document.getElementById('don-campus').value = '';
             document.getElementById(`${prefix}-form-title`).innerText = prefix === 'res' ? 'Add New Record' : prefix === 'nssf' ? 'Upload Monthly NSSF' : 'Add Donation Record';
