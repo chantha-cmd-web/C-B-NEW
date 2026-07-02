@@ -987,8 +987,8 @@
                 for (const entry of gepEntries) {
                     if (!staffLookup[entry.staffId]) {
                         staffMasterData.push(entry);
-                        staffLookup[entry.staffId] = entry;
                     }
+                    staffLookup[entry.staffId] = entry;
                 }
                 staffMasterReady = true;
                 document.getElementById('master-list-status').innerHTML = '<i class="fa-solid fa-check-circle" style="color:var(--success)"></i> Staff data loaded (' + staffMasterData.length + ' records)';
