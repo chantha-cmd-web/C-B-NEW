@@ -887,6 +887,7 @@
         let staffMasterReady = false;
         let deferredFill = null;
         const MASTER_LIST_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTO68GX9WFErMXR7GxUbaAybv0Vu-Cuia482ACsE8LDVOy_g_fAmvuEG7Y6WTSAII_PG521XZoBgBM_/pub?output=csv&gid=1500996284';
+        const GEP_LIST_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSo5PpOTysYI5K_9J-cFrBujd1C_Rk5xoypXRHZ51olBo1TNnauYBqsm2_UiIl99C_FhYIl3lLYTY2o/pub?output=csv';
 
         function parseCSV(text) {
             const rows = []; let row = [], field = '', inQ = false;
@@ -924,52 +925,70 @@
             return val.trim();
         }
 
+        async function parseStaffCSV(csvText, sourceLabel) {
+            const allRows = parseCSV(csvText);
+            let headerRow = null, headerRowIndex = -1;
+            for (let i = 0; i < allRows.length; i++) {
+                const r = allRows[i];
+                if (r.some(c => c && c.trim() === 'Staff ID')) {
+                    headerRow = r;
+                    headerRowIndex = i;
+                    break;
+                }
+            }
+            if (!headerRow) { console.warn(sourceLabel + ': header row not found'); return []; }
+            const sidCol = headerRow.findIndex(c => c && c.trim() === 'Staff ID');
+            const idx = {
+                staffId: sidCol,
+                name: findHeaderIndex(headerRow, 'English Name') !== -1 ? findHeaderIndex(headerRow, 'English Name') : (findHeaderIndex(headerRow, 'Name') !== -1 ? findHeaderIndex(headerRow, 'Name') : findHeaderIndex(headerRow, 'Staff Name')),
+                nationality: findHeaderIndex(headerRow, 'Nationality'),
+                status: findHeaderIndex(headerRow, "Staff's Type") !== -1 ? findHeaderIndex(headerRow, "Staff's Type") : findHeaderIndex(headerRow, 'Status'),
+                start: findHeaderIndex(headerRow, 'DOJ') !== -1 ? findHeaderIndex(headerRow, 'DOJ') : findHeaderIndex(headerRow, 'Start Date'),
+                campus: findHeaderIndex(headerRow, 'Campus'),
+                position: findHeaderIndex(headerRow, 'Current Position') !== -1 ? findHeaderIndex(headerRow, 'Current Position') : findHeaderIndex(headerRow, 'Position'),
+                department: findHeaderIndex(headerRow, 'Department'),
+                lastDay: findHeaderIndex(headerRow, 'Last day of Employee') !== -1 ? findHeaderIndex(headerRow, 'Last day of Employee') : findHeaderIndex(headerRow, 'Last Working Day')
+            };
+            const entries = [];
+            for (let i = headerRowIndex + 1; i < allRows.length; i++) {
+                const r = allRows[i];
+                const sid = r[idx.staffId];
+                if (!sid || sid.trim() === '') continue;
+                const entry = {
+                    staffId: sid.trim(),
+                    name: idx.name !== -1 ? (r[idx.name]||'') : '',
+                    nationality: idx.nationality !== -1 ? (r[idx.nationality]||'') : '',
+                    status: idx.status !== -1 ? normalizeStatus(r[idx.status]||'') : '',
+                    start: idx.start !== -1 ? (r[idx.start]||'') : '',
+                    campus: idx.campus !== -1 ? (r[idx.campus]||'') : '',
+                    position: idx.position !== -1 ? (r[idx.position]||'') : '',
+                    department: idx.department !== -1 ? (r[idx.department]||'') : '',
+                    lastDay: idx.lastDay !== -1 ? (r[idx.lastDay]||'') : ''
+                };
+                entries.push(entry);
+            }
+            return entries;
+        }
+
         async function fetchMasterList() {
             document.getElementById('master-list-status').innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Loading staff data...';
             try {
-                const resp = await fetch(MASTER_LIST_URL);
-                const csv = await resp.text();
-                const allRows = parseCSV(csv);
-                let headerRow = null, headerRowIndex = -1;
-                for (let i = 0; i < allRows.length; i++) {
-                    const r = allRows[i];
-                    if (r.some(c => c && c.trim() === 'Staff ID')) {
-                        headerRow = r;
-                        headerRowIndex = i;
-                        break;
-                    }
-                }
-                if (!headerRow) { console.warn('Master List: header row not found'); staffMasterReady = true; document.getElementById('master-list-status').innerHTML = ''; return; }
-                const sidCol = headerRow.findIndex(c => c && c.trim() === 'Staff ID');
-                const idx = {
-                    staffId: sidCol,
-                    name: findHeaderIndex(headerRow, 'English Name') !== -1 ? findHeaderIndex(headerRow, 'English Name') : (findHeaderIndex(headerRow, 'Name') !== -1 ? findHeaderIndex(headerRow, 'Name') : findHeaderIndex(headerRow, 'Staff Name')),
-                    nationality: findHeaderIndex(headerRow, 'Nationality'),
-                    status: findHeaderIndex(headerRow, "Staff's Type") !== -1 ? findHeaderIndex(headerRow, "Staff's Type") : findHeaderIndex(headerRow, 'Status'),
-                    start: findHeaderIndex(headerRow, 'DOJ') !== -1 ? findHeaderIndex(headerRow, 'DOJ') : findHeaderIndex(headerRow, 'Start Date'),
-                    campus: findHeaderIndex(headerRow, 'Campus'),
-                    position: findHeaderIndex(headerRow, 'Current Position') !== -1 ? findHeaderIndex(headerRow, 'Current Position') : findHeaderIndex(headerRow, 'Position'),
-                    department: findHeaderIndex(headerRow, 'Department'),
-                    lastDay: findHeaderIndex(headerRow, 'Last day of Employee') !== -1 ? findHeaderIndex(headerRow, 'Last day of Employee') : findHeaderIndex(headerRow, 'Last Working Day')
-                };
+                const [fullResp, gepResp] = await Promise.all([
+                    fetch(MASTER_LIST_URL).then(r => r.text()),
+                    fetch(GEP_LIST_URL).then(r => r.text())
+                ]);
+                const fullEntries = await parseStaffCSV(fullResp, 'Full-time List');
+                const gepEntries = await parseStaffCSV(gepResp, 'GEP List');
                 staffMasterData = []; staffLookup = {};
-                for (let i = headerRowIndex + 1; i < allRows.length; i++) {
-                    const r = allRows[i];
-                    const sid = r[idx.staffId];
-                    if (!sid || sid.trim() === '') continue;
-                    const entry = {
-                        staffId: sid.trim(),
-                        name: idx.name !== -1 ? (r[idx.name]||'') : '',
-                        nationality: idx.nationality !== -1 ? (r[idx.nationality]||'') : '',
-                        status: idx.status !== -1 ? normalizeStatus(r[idx.status]||'') : '',
-                        start: idx.start !== -1 ? (r[idx.start]||'') : '',
-                        campus: idx.campus !== -1 ? (r[idx.campus]||'') : '',
-                        position: idx.position !== -1 ? (r[idx.position]||'') : '',
-                        department: idx.department !== -1 ? (r[idx.department]||'') : '',
-                        lastDay: idx.lastDay !== -1 ? (r[idx.lastDay]||'') : ''
-                    };
+                for (const entry of fullEntries) {
                     staffMasterData.push(entry);
                     staffLookup[entry.staffId] = entry;
+                }
+                for (const entry of gepEntries) {
+                    if (!staffLookup[entry.staffId]) {
+                        staffMasterData.push(entry);
+                        staffLookup[entry.staffId] = entry;
+                    }
                 }
                 staffMasterReady = true;
                 document.getElementById('master-list-status').innerHTML = '<i class="fa-solid fa-check-circle" style="color:var(--success)"></i> Staff data loaded (' + staffMasterData.length + ' records)';
@@ -984,7 +1003,7 @@
                 const donId = document.getElementById('don-id')?.value;
                 if (donId) autoFillDonation(donId);
             } catch (e) {
-                console.error('Failed to fetch Master List:', e);
+                console.error('Failed to fetch staff data:', e);
                 staffMasterReady = true;
                 document.getElementById('master-list-status').innerHTML = '<i class="fa-solid fa-circle-exclamation" style="color:var(--danger)"></i> Failed to load staff data';
                 setTimeout(() => { const el = document.getElementById('master-list-status'); if (el) el.innerHTML = ''; }, 6000);
@@ -1024,7 +1043,7 @@
                 document.getElementById('master-list-status').innerHTML = '<i class="fa-solid fa-circle-exclamation" style="color:var(--danger)"></i> Staff ID not found';
                 return;
             }
-            document.getElementById('master-list-status').innerHTML = '<i class="fa-solid fa-check-circle" style="color:var(--success)"></i> Auto-filled from Master List';
+            document.getElementById('master-list-status').innerHTML = '<i class="fa-solid fa-check-circle" style="color:var(--success)"></i> Auto-filled from staff data';
             document.getElementById('res-name').value = entry.name;
             document.getElementById('res-nationality').value = entry.nationality;
             if (entry.campus) document.getElementById('res-campus').value = entry.campus;
@@ -1050,7 +1069,7 @@
                 document.getElementById('master-list-status').innerHTML = '<i class="fa-solid fa-circle-exclamation" style="color:var(--danger)"></i> Staff ID not found';
                 return;
             }
-            document.getElementById('master-list-status').innerHTML = '<i class="fa-solid fa-check-circle" style="color:var(--success)"></i> Auto-filled from Master List';
+            document.getElementById('master-list-status').innerHTML = '<i class="fa-solid fa-check-circle" style="color:var(--success)"></i> Auto-filled from staff data';
             document.getElementById('don-name').value = entry.name;
             if (entry.campus) document.getElementById('don-campus').value = entry.campus;
             if (entry.status) document.getElementById('don-status').value = entry.status;
