@@ -737,6 +737,7 @@
                     <p id="docUnsupportedMsg" style="color:var(--text-secondary);font-size:1rem;line-height:1.5;margin:0;"></p>
                     <div id="docUnsupportedActions" style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;"></div>
                 </div>
+                <button id="docOneDriveBtn" onclick="if(window.currentOneDriveUrl){window.open(window.currentOneDriveUrl,'_blank')}" style="display:none;position:absolute;top:10px;right:10px;padding:6px 14px;border-radius:10px;border:1px solid var(--glass-border);background:var(--glass-bg);backdrop-filter:blur(8px);color:var(--text-primary);cursor:pointer;font-size:0.8rem;font-weight:500;z-index:5;box-shadow:0 2px 8px rgba(0,0,0,0.1);transition:var(--transition);font-family:'Inter',sans-serif;"><i class="fa-solid fa-arrow-up-right-from-square" style="color:var(--accent-primary);"></i> Open in OneDrive</button>
             </div>
         </div>
     </div>
@@ -1288,6 +1289,8 @@
             } catch (e) { /* ignore */ }
         }
 
+        let currentOneDriveUrl = null;
+
         function openPdfViewer(collection, id) {
             const record = db[collection].find(r => r.id === id);
             if (!record) return;
@@ -1298,11 +1301,13 @@
             const unsupportedEl = document.getElementById('docUnsupported');
             const unsupportedMsg = document.getElementById('docUnsupportedMsg');
             const unsupportedActions = document.getElementById('docUnsupportedActions');
+            const oneDriveBtn = document.getElementById('docOneDriveBtn');
 
             function hideAllViewers() {
                 embedEl.style.display = 'none'; embedEl.src = '';
                 imgEl.style.display = 'none'; imgEl.src = '';
                 unsupportedEl.style.display = 'none';
+                oneDriveBtn.style.display = 'none';
             }
 
             function getFileExt(name) { return name.split('.').pop().toLowerCase(); }
@@ -1333,6 +1338,41 @@
                 }
             }
 
+            function renderFileButtons() {
+                listEl.innerHTML = record.files.map((f, i) => {
+                    const src = f.data || f.url || '';
+                    const safeSrc = src.replace(/'/g, "\\'");
+                    const name = f.name || 'File';
+                    const safeName = name.replace(/'/g, "\\'");
+                    const ext = getFileExt(name);
+                    const fileIcon = ext === 'pdf' ? 'fa-file-pdf' :
+                        /docx?/.test(ext) ? 'fa-file-word' :
+                        /xlsx?/.test(ext) ? 'fa-file-excel' :
+                        /pptx?/.test(ext) ? 'fa-file-powerpoint' :
+                        /jpg|jpeg|png|gif|bmp|svg|webp|ico/i.test(ext) ? 'fa-file-image' :
+                        'fa-file';
+                    const fileColor = ext === 'pdf' ? 'var(--danger)' :
+                        /docx?/.test(ext) ? 'var(--info)' :
+                        /xlsx?/.test(ext) ? 'var(--success)' :
+                        /pptx?/.test(ext) ? 'var(--accent-gold)' :
+                        /jpg|jpeg|png|gif|bmp|svg|webp|ico/i.test(ext) ? 'var(--accent-primary)' :
+                        'var(--text-muted)';
+                    const btn = `<button data-src="${safeSrc}" data-name="${safeName}" style="padding:4px 12px;border-radius:8px;border:1px solid var(--glass-border);background:var(--input-bg);color:var(--text-primary);cursor:pointer;font-size:0.8rem;"><i class="fa-solid ${fileIcon}" style="color:${fileColor};"></i> ${safeName}</button>`;
+                    if (f.url && isOneDriveUrl(f.url)) {
+                        return `<span style="display:inline-flex;align-items:center;gap:2px;">${btn}<button onclick="event.stopPropagation();window.open('${safeSrc}','_blank')" title="Open in OneDrive" style="padding:4px 6px;border-radius:6px;border:1px solid var(--glass-border);background:var(--input-bg);color:var(--accent-primary);cursor:pointer;font-size:0.75rem;transition:var(--transition);"><i class="fa-solid fa-arrow-up-right-from-square"></i></button></span>`;
+                    }
+                    return btn;
+                }).join('');
+                listEl.querySelectorAll('button[data-src]').forEach((btn) => {
+                    btn.onclick = function() {
+                        hideAllViewers();
+                        showViewer({ data: this.dataset.src, name: this.dataset.name, url: this.dataset.src });
+                        listEl.querySelectorAll('button[data-src], button[data-name]').forEach(b => b.style.outline = 'none');
+                        this.style.outline = '2px solid var(--accent-primary)';
+                    };
+                });
+            }
+
             function showViewer(file) {
                 const src = file.data || file.url || '';
                 const name = file.name || 'Document';
@@ -1340,6 +1380,9 @@
                 const imageExts = ['jpg','jpeg','png','gif','bmp','svg','webp','ico','avif'];
                 const embeddableExts = ['pdf','svg'];
                 const officeOnlineExts = ['docx','xlsx','pptx'];
+
+                currentOneDriveUrl = (file.url && isOneDriveUrl(file.url)) ? file.url : null;
+                oneDriveBtn.style.display = currentOneDriveUrl ? 'block' : 'none';
 
                 if (src.startsWith('data:')) {
                     const mime = src.split(';')[0].split(':')[1] || '';
@@ -1377,39 +1420,11 @@
                 document.getElementById('pdfModal').style.display = 'flex';
             } else if (record.files && record.files.length > 0) {
                 titleEl.innerText = `Document Viewer - ${record.files.length} file(s)`;
-                listEl.innerHTML = record.files.map((f, i) => {
-                    const src = f.data || f.url || '';
-                    const safeSrc = src.replace(/'/g, "\\'");
-                    const name = f.name || 'File';
-                    const ext = getFileExt(name);
-                    const fileIcon = ext === 'pdf' ? 'fa-file-pdf' :
-                        /docx?/.test(ext) ? 'fa-file-word' :
-                        /xlsx?/.test(ext) ? 'fa-file-excel' :
-                        /pptx?/.test(ext) ? 'fa-file-powerpoint' :
-                        /jpg|jpeg|png|gif|bmp|svg|webp|ico/i.test(ext) ? 'fa-file-image' :
-                        'fa-file';
-                    const fileColor = ext === 'pdf' ? 'var(--danger)' :
-                        /docx?/.test(ext) ? 'var(--info)' :
-                        /xlsx?/.test(ext) ? 'var(--success)' :
-                        /pptx?/.test(ext) ? 'var(--accent-gold)' :
-                        /jpg|jpeg|png|gif|bmp|svg|webp|ico/i.test(ext) ? 'var(--accent-primary)' :
-                        'var(--text-muted)';
-                    if (f.url && !f.data) {
-                        return `<button onclick="window.open('${safeSrc}','_blank')" style="padding:4px 12px;border-radius:8px;border:1px solid var(--glass-border);background:var(--input-bg);color:var(--text-primary);cursor:pointer;font-size:0.8rem;"><i class="fa-solid fa-link" style="color:var(--accent-primary);"></i> ${name}</button>`;
-                    }
-                    return `<button data-src="${safeSrc}" data-name="${name}" style="padding:4px 12px;border-radius:8px;border:1px solid var(--glass-border);background:var(--input-bg);color:var(--text-primary);cursor:pointer;font-size:0.8rem;"><i class="fa-solid ${fileIcon}" style="color:${fileColor};"></i> ${name}</button>`;
-                }).join('');
-                listEl.querySelectorAll('button[data-src]').forEach((btn) => {
-                    btn.onclick = function() {
-                        hideAllViewers();
-                        showViewer({ data: this.dataset.src, name: this.dataset.name, url: this.dataset.src });
-                        listEl.querySelectorAll('button').forEach(b => b.style.outline = 'none');
-                        this.style.outline = '2px solid var(--accent-primary)';
-                    };
-                });
+                renderFileButtons();
                 if (record.files[0].data || record.files[0].url) {
                     showViewer(record.files[0]);
-                    if (listEl.firstChild) listEl.firstChild.style.outline = '2px solid var(--accent-primary)';
+                    const firstPreviewBtn = listEl.querySelector('button[data-src]');
+                    if (firstPreviewBtn) firstPreviewBtn.style.outline = '2px solid var(--accent-primary)';
                 }
                 document.getElementById('pdfModal').style.display = 'flex';
             } else {
@@ -1423,7 +1438,9 @@
             document.getElementById('docImgViewer').src = '';
             document.getElementById('docImgViewer').style.display = 'none';
             document.getElementById('docUnsupported').style.display = 'none';
+            document.getElementById('docOneDriveBtn').style.display = 'none';
             document.getElementById('pdfFileList').innerHTML = '';
+            currentOneDriveUrl = null;
         }
         function downloadDocFile(dataUrl, filename) {
             const a = document.createElement('a');
