@@ -1312,8 +1312,16 @@
 
             function getFileExt(name) { return name.split('.').pop().toLowerCase(); }
 
+            function isConsumerOneDrive(url) {
+                return /onedrive\.live\.com|1drv\.ms/i.test(url);
+            }
+
+            function isSharePointUrl(url) {
+                return /sharepoint\.com/i.test(url);
+            }
+
             function isOneDriveUrl(url) {
-                return /onedrive\.live\.com|1drv\.ms|sharepoint\.com/i.test(url);
+                return isConsumerOneDrive(url) || isSharePointUrl(url);
             }
 
             function isOfficeDoc(ext) {
@@ -1394,9 +1402,16 @@
                         showUnsupported(name, file);
                     }
                 } else if (file.url) {
-                    if (isOneDriveUrl(file.url)) {
+                    if (isConsumerOneDrive(file.url)) {
                         const oneDriveEmbed = file.url.includes('?') ? file.url + '&embed=1' : file.url + '?embed=1';
                         embedEl.src = oneDriveEmbed; embedEl.style.display = 'block';
+                    } else if (isSharePointUrl(file.url)) {
+                        if (isOfficeDoc(ext) && officeOnlineExts.includes(ext)) {
+                            embedEl.src = 'https://view.officeapps.live.com/op/embed.aspx?src=' + encodeURIComponent(file.url);
+                            embedEl.style.display = 'block';
+                        } else {
+                            showUnsupported(name, file);
+                        }
                     } else if (isOfficeDoc(ext) && officeOnlineExts.includes(ext)) {
                         embedEl.src = 'https://view.officeapps.live.com/op/embed.aspx?src=' + encodeURIComponent(file.url);
                         embedEl.style.display = 'block';
