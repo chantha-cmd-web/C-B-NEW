@@ -1630,8 +1630,9 @@
                         if (imageExts.includes(ext)) {
                             imgEl.src = file.url; imgEl.style.display = 'block';
                         } else {
-                            embedEl.src = 'https://view.officeapps.live.com/op/embed.aspx?src=' + encodeURIComponent(file.url);
-                            embedEl.style.display = 'block';
+                            window.open(file.url, '_blank');
+                            showUnsupported(name, file);
+                            unsupportedMsg.innerHTML = 'Opening <strong>' + name.replace(/'/g, "\\'") + '</strong> in OneDrive...';
                         }
                     } else if (isOfficeDoc(ext) && officeOnlineExts.includes(ext)) {
                         embedEl.src = 'https://view.officeapps.live.com/op/embed.aspx?src=' + encodeURIComponent(file.url);
