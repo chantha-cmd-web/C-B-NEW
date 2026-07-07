@@ -1627,11 +1627,11 @@
                         const oneDriveEmbed = file.url.includes('?') ? file.url + '&embed=1' : file.url + '?embed=1';
                         embedEl.src = oneDriveEmbed; embedEl.style.display = 'block';
                     } else if (isSharePointUrl(file.url)) {
-                        if (isOfficeDoc(ext) && officeOnlineExts.includes(ext)) {
+                        if (imageExts.includes(ext)) {
+                            imgEl.src = file.url; imgEl.style.display = 'block';
+                        } else {
                             embedEl.src = 'https://view.officeapps.live.com/op/embed.aspx?src=' + encodeURIComponent(file.url);
                             embedEl.style.display = 'block';
-                        } else {
-                            showUnsupported(name, file);
                         }
                     } else if (isOfficeDoc(ext) && officeOnlineExts.includes(ext)) {
                         embedEl.src = 'https://view.officeapps.live.com/op/embed.aspx?src=' + encodeURIComponent(file.url);
